@@ -22,6 +22,7 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.RemoteMessage;
 
 import org.apache.cordova.CallbackContext;
+import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.PluginResult;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -31,14 +32,12 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
-import by.chemerisuk.cordova.support.CordovaMethod;
-import by.chemerisuk.cordova.support.ReflectiveCordovaPlugin;
 import me.leolin.shortcutbadger.ShortcutBadger;
 
 import static androidx.core.content.ContextCompat.getSystemService;
 
 
-public class FirebaseMessagingPlugin extends ReflectiveCordovaPlugin {
+public class FirebaseMessagingPlugin extends CordovaPlugin {
     private static final String TAG = "FirebaseMessagingPlugin";
 
     private JSONObject lastBundle;
@@ -58,7 +57,50 @@ public class FirebaseMessagingPlugin extends ReflectiveCordovaPlugin {
         lastBundle = getNotificationData(cordova.getActivity().getIntent());
     }
 
-    @CordovaMethod
+    @Override
+    public boolean execute(String action, JSONArray args, CallbackContext callbackContext) {
+        try {
+            if ("subscribe".equals(action)) {
+                subscribe(args.isNull(0) ? null : args.getString(0), callbackContext);
+            } else if ("unsubscribe".equals(action)) {
+                unsubscribe(args.isNull(0) ? null : args.getString(0), callbackContext);
+            } else if ("revokeToken".equals(action)) {
+                revokeToken(callbackContext);
+            } else if ("getInstanceId".equals(action)) {
+                getInstanceId(callbackContext);
+            } else if ("getToken".equals(action)) {
+                getToken(args.isNull(0) ? null : args.getString(0), callbackContext);
+            } else if ("onTokenRefresh".equals(action)) {
+                onTokenRefresh(callbackContext);
+            } else if ("onMessage".equals(action)) {
+                onMessage(callbackContext);
+            } else if ("onBackgroundMessage".equals(action)) {
+                onBackgroundMessage(callbackContext);
+            } else if ("setBadge".equals(action)) {
+                setBadge(args.getInt(0), callbackContext);
+            } else if ("getBadge".equals(action)) {
+                getBadge(callbackContext);
+            } else if ("requestPermission".equals(action)) {
+                requestPermission(args.getJSONObject(0), callbackContext);
+            } else if ("createChannel".equals(action)) {
+                createChannel(args.getJSONObject(0), callbackContext);
+            } else if ("findChannel".equals(action)) {
+                findChannel(args.isNull(0) ? null : args.getString(0), callbackContext);
+            } else if ("listChannels".equals(action)) {
+                listChannels(callbackContext);
+            } else if ("deleteChannel".equals(action)) {
+                deleteChannel(args.isNull(0) ? null : args.getString(0), callbackContext);
+            } else {
+                return false;
+            }
+        } catch (Throwable e) {
+            Log.e(TAG, "Uncaught exception", e);
+            callbackContext.error(e.getMessage());
+        }
+
+        return true;
+    }
+
     private void subscribe(String topic, final CallbackContext callbackContext) {
         FirebaseMessaging.getInstance().subscribeToTopic(topic)
             .addOnCompleteListener(cordova.getActivity(), new OnCompleteListener<Void>() {
@@ -73,7 +115,6 @@ public class FirebaseMessagingPlugin extends ReflectiveCordovaPlugin {
             });
     }
 
-    @CordovaMethod
     private void unsubscribe(String topic, final CallbackContext callbackContext) {
         FirebaseMessaging.getInstance().unsubscribeFromTopic(topic)
             .addOnCompleteListener(cordova.getActivity(), new OnCompleteListener<Void>() {
@@ -88,14 +129,12 @@ public class FirebaseMessagingPlugin extends ReflectiveCordovaPlugin {
             });
     }
 
-    @CordovaMethod
     private void revokeToken(CallbackContext callbackContext) throws IOException {
         FirebaseInstanceId.getInstance().deleteInstanceId();
 
         callbackContext.success();
     }
 
-    @CordovaMethod
     private void getInstanceId(final CallbackContext callbackContext) {
         FirebaseInstanceId.getInstance().getInstanceId()
             .addOnCompleteListener(cordova.getActivity(), new OnCompleteListener<InstanceIdResult>() {
@@ -110,7 +149,6 @@ public class FirebaseMessagingPlugin extends ReflectiveCordovaPlugin {
             });
     }
 
-    @CordovaMethod
     private void getToken(String type, final CallbackContext callbackContext) {
         if (type != null) {
             callbackContext.sendPluginResult(
@@ -130,17 +168,14 @@ public class FirebaseMessagingPlugin extends ReflectiveCordovaPlugin {
         }
     }
 
-    @CordovaMethod
     private void onTokenRefresh(CallbackContext callbackContext) {
         instance.tokenRefreshCallback = callbackContext;
     }
 
-    @CordovaMethod
     private void onMessage(CallbackContext callbackContext) {
         instance.foregroundCallback = callbackContext;
     }
 
-    @CordovaMethod
     private void onBackgroundMessage(CallbackContext callbackContext) {
         instance.backgroundCallback = callbackContext;
 
@@ -150,7 +185,6 @@ public class FirebaseMessagingPlugin extends ReflectiveCordovaPlugin {
         }
     }
 
-    @CordovaMethod
     private void setBadge(int value, CallbackContext callbackContext) {
         if (value >= 0) {
             Context context = cordova.getActivity().getApplicationContext();
@@ -162,14 +196,12 @@ public class FirebaseMessagingPlugin extends ReflectiveCordovaPlugin {
         }
     }
 
-    @CordovaMethod
     private void getBadge(CallbackContext callbackContext) {
         Context context = cordova.getActivity();
         SharedPreferences settings = context.getSharedPreferences("badge", Context.MODE_PRIVATE);
         callbackContext.success(settings.getInt("badge", 0));
     }
 
-    @CordovaMethod
     private void requestPermission(JSONObject options, CallbackContext callbackContext) throws JSONException {
         Context context = cordova.getActivity().getApplicationContext();
 
@@ -182,7 +214,6 @@ public class FirebaseMessagingPlugin extends ReflectiveCordovaPlugin {
         }
     }
 
-    @CordovaMethod
     private void createChannel(JSONObject options, CallbackContext callbackContext) throws JSONException {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             throw new UnsupportedOperationException("Notification channels are not supported");
@@ -226,7 +257,6 @@ public class FirebaseMessagingPlugin extends ReflectiveCordovaPlugin {
         callbackContext.success();
     }
 
-    @CordovaMethod
     private void findChannel(String channelId, CallbackContext callbackContext) throws JSONException {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             throw new UnsupportedOperationException("Notification channels are not supported");
@@ -240,7 +270,6 @@ public class FirebaseMessagingPlugin extends ReflectiveCordovaPlugin {
         }
     }
 
-    @CordovaMethod
     private void listChannels(CallbackContext callbackContext) throws JSONException {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             throw new UnsupportedOperationException("Notification channels are not supported");
@@ -255,7 +284,6 @@ public class FirebaseMessagingPlugin extends ReflectiveCordovaPlugin {
         callbackContext.success(result);
     }
 
-    @CordovaMethod
     private void deleteChannel(String channelId, CallbackContext callbackContext) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             throw new UnsupportedOperationException("Notification channels are not supported");
